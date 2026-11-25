@@ -1,0 +1,12 @@
+client_id,client_name,asset_class,target_pct
+C1,Beaumont Family,Public Equity,40
+C1,Beaumont Family,Fixed Income,25
+C1,Beaumont Family,Private Equity,20
+C1,Beaumont Family,Infrastructure,15
+C2,Tran Family,Public Equity,45
+C2,Tran Family,Fixed Income,20
+C2,Tran Family,Private Credit,15
+C2,Tran Family,Real Assets,20
+C3,Okafor Family,Public Equity,50
+C3,Okafor Family,Fixed Income,30
+C3,Okafor Family,Private Equity,20
