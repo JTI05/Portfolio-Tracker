@@ -36,7 +36,7 @@ Each private deal is measured from its dated cash flows and its current value.
 ## How the numbers were verified
 
 - The IRR for each deal was checked by hand against Excel's XIRR.
-- Automated tests in `test_metrics.py` check every metric against the expected results: paid-in, distributions, DPI, RVPI, TVPI and IRR for each private deal, allocation gaps for each client, a known-answer XIRR case, and that results do not depend on the order of the cash flow rows. All 10 tests pass.
+- Automated tests in `test_metrics.py` check every metric against the expected results: paid-in, distributions, DPI, RVPI, TVPI and IRR for each private deal, the largest allocation gap for each client, a known-answer XIRR case, and that results do not depend on the order of the cash flow rows. All 10 tests pass.
 
 ## Project structure
 
