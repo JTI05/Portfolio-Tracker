@@ -1,0 +1,14 @@
+# Dark theme for the Portfolio Tracker dashboard.
+# Colours only - nothing here affects any number or calculation.
+
+[theme]
+base = "dark"
+backgroundColor = "#141414"           # page background
+secondaryBackgroundColor = "#1E1E1E"  # panels, inputs, table headers
+textColor = "#F8F5F0"                 # main text
+primaryColor = "#C1A65D"              # accent (selected items, focus rings)
+
+# Headings in Playfair Display (loaded from Google Fonts), falling back to the
+# built-in serif if the font can't be downloaded. Body text stays sans-serif.
+headingFont = "Playfair Display:https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap, serif"
+font = "sans-serif"
