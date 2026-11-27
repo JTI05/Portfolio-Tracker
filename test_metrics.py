@@ -3,7 +3,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from metrics import allocation_gaps, private_investment_metrics, xirr
+from metrics import (
+    allocation_gaps,
+    capital_call_coverage,
+    private_investment_metrics,
+    rebalancing,
+    xirr,
+)
 
 # The tests use fixed CSV copies of the data, not data/portfolio_data.xlsx,
 # so editing the workbook never changes the expected results below.
@@ -27,6 +33,34 @@ EXPECTED_GAPS = [
     ("Beaumont Family", "Private Equity", -2.6),
     ("Tran Family", "Real Assets", -2.2),
     ("Okafor Family", "Public Equity", 2.0),
+]
+
+EXPECTED_UNFUNDED = {
+    "I01": 100_000,
+    "I02": 0,
+    "I05": 50_000,
+    "I06": 0,
+    "I09": 100_000,
+}
+
+EXPECTED_COVERAGE = [
+    ("C1", 15.0),  # Beaumont Family
+    ("C2", 20.0),  # Tran Family
+    ("C3", 7.0),   # Okafor Family
+]
+
+EXPECTED_REBALANCE = [
+    ("Beaumont Family", "Public Equity", -24_000),
+    ("Beaumont Family", "Fixed Income", -52_500),
+    ("Beaumont Family", "Private Equity", 58_000),
+    ("Beaumont Family", "Infrastructure", 18_500),
+    ("Tran Family", "Public Equity", -31_750),
+    ("Tran Family", "Fixed Income", -3_000),
+    ("Tran Family", "Private Credit", 2_750),
+    ("Tran Family", "Real Assets", 32_000),
+    ("Okafor Family", "Public Equity", -17_500),
+    ("Okafor Family", "Fixed Income", 9_500),
+    ("Okafor Family", "Private Equity", 8_000),
 ]
 
 
@@ -79,3 +113,31 @@ def test_results_do_not_depend_on_row_order(data):
     b = private_investment_metrics(investments, shuffled)
     for col in ["paid_in", "distributions", "dpi", "rvpi", "tvpi", "irr"]:
         assert a[col].tolist() == pytest.approx(b[col].tolist())
+
+
+@pytest.mark.parametrize("inv_id,unfunded", EXPECTED_UNFUNDED.items())
+def test_unfunded(pm, inv_id, unfunded):
+    assert pm.loc[inv_id, "unfunded"] == pytest.approx(unfunded)
+
+
+@pytest.mark.parametrize("client_id,expected", EXPECTED_COVERAGE)
+def test_capital_call_coverage(data, client_id, expected):
+    investments, cash_flows, _ = data
+    cov = capital_call_coverage(investments, cash_flows)
+    assert cov.loc[client_id, "coverage"] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("client_name,asset_class,amount", EXPECTED_REBALANCE)
+def test_rebalancing(data, client_name, asset_class, amount):
+    investments, _, targets = data
+    rb = rebalancing(investments, targets)
+    row = rb[(rb["client_name"] == client_name) & (rb["asset_class"] == asset_class)]
+    assert len(row) == 1
+    assert row["rebalance"].iloc[0] == pytest.approx(amount, abs=0.01)
+
+
+def test_rebalancing_sums_to_zero(data):
+    investments, _, targets = data
+    rb = rebalancing(investments, targets)
+    for client_id, total in rb.groupby("client_id")["rebalance"].sum().items():
+        assert total == pytest.approx(0, abs=0.01), client_id
