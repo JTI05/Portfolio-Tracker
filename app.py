@@ -331,7 +331,7 @@ rebal_table = pd.DataFrame({
     "Target": client_rebal["target_value"],
     "Rebalance": client_rebal["rebalance"],
     "How": client_rebal["liquidity"].map({"public": "Trade", "private": "New commitments"}),
-}).reset_index(drop=True)
+}).sort_values("Rebalance", key=abs, ascending=False, kind="stable").reset_index(drop=True)
 st.dataframe(
     rebal_table.style.format({
         "Current": fmt_dollars,
