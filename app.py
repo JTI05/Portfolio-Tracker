@@ -13,8 +13,8 @@ import streamlit as st
 
 from metrics import DATA_FILE, allocation_gaps, load_data, private_investment_metrics
 
-ACTUAL_COLOR = "#1f4e79"  # dark blue
-TARGET_COLOR = "#a6b8c9"  # light grey-blue
+ACTUAL_COLOR = "#C1A65D"  # accent gold
+TARGET_COLOR = "#6F6E6C"  # muted grey
 
 
 # ---------------------------------------------------------------------------
