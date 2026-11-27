@@ -28,8 +28,20 @@ CUSTOM_CSS = """
 }
 [data-testid="stHeader"] { background: transparent; }
 
-/* Centered layout, slightly wider than default so all nine table columns fit */
-[data-testid="stMainBlockContainer"] { max-width: 880px; }
+/* Wide layout, but capped at 1400px and centred so lines don't stretch on
+   very large monitors. Comfortable padding on both sides; less on phones. */
+[data-testid="stMainBlockContainer"] {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding-left: 3rem;
+    padding-right: 3rem;
+}
+@media (max-width: 640px) {
+    [data-testid="stMainBlockContainer"] {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
 
 /* Small gold uppercase label with a short gold line before it */
 .eyebrow {
@@ -136,7 +148,7 @@ def get_metrics(data_mtime):
 # Page
 # ---------------------------------------------------------------------------
 
-st.set_page_config(page_title="Portfolio Tracker", layout="centered")
+st.set_page_config(page_title="Portfolio Tracker", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 eyebrow("Family office dashboard")
@@ -245,7 +257,10 @@ chart = (
     .configure_axis(grid=False)           # no gridlines
     .configure_view(stroke=None)          # no box around the plot
 )
-st.altair_chart(chart, width="stretch")
+# Chart on the left (about 60%), table on the right (about 40%).
+# Streamlit stacks the columns automatically on narrow screens such as phones.
+chart_col, table_col = st.columns([3, 2], gap="large")
+chart_col.altair_chart(chart, width="stretch")
 
 alloc_table = pd.DataFrame({
     "Asset class": client_gaps["asset_class"],
@@ -253,7 +268,7 @@ alloc_table = pd.DataFrame({
     "Target %": client_gaps["target_pct"],
     "Gap (pp)": client_gaps["gap_pp"],
 }).reset_index(drop=True)
-st.dataframe(
+table_col.dataframe(
     alloc_table.style.format({
         "Actual %": fmt_pct,
         "Target %": fmt_pct,
