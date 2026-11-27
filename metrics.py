@@ -2,9 +2,11 @@
 
 Reads the investments, cash_flows and targets tabs of data/portfolio_data.xlsx
 and computes:
-  * per private investment: paid-in, distributions, current value,
-    DPI, RVPI, TVPI and IRR (XIRR, 365-day year)
+  * per private investment: commitment, paid-in, unfunded, distributions,
+    current value, DPI, RVPI, TVPI and IRR (XIRR, 365-day year)
   * per client: actual allocation % by asset class and the gap to target
+  * per client: capital call coverage (liquid public value / unfunded)
+  * per client and asset class: the dollar amount that would bring it to target
 """
 
 from datetime import date
@@ -109,7 +111,8 @@ def xirr(dates, amounts, guess=0.1, tol=1e-10, max_iter=200):
 # ---------------------------------------------------------------------------
 
 def private_investment_metrics(investments, cash_flows):
-    """One row per private investment with paid-in, distributions, DPI, RVPI, TVPI, IRR."""
+    """One row per private investment with commitment, paid-in, unfunded,
+    distributions, DPI, RVPI, TVPI, IRR."""
     private = investments[investments["type"] == "private"].set_index("investment_id")
 
     # Sum cash flows by investment_id and flow_type (never by row position),
@@ -129,7 +132,12 @@ def private_investment_metrics(investments, cash_flows):
     out["client_id"] = private["client_id"]
     out["asset_class"] = private["asset_class"]
     # Contributions are stored as negatives; show paid-in as a positive number.
+    out["commitment"] = private["commitment"]
     out["paid_in"] = -totals["contribution"]
+    # Unfunded = capital the client has promised but not yet been asked for.
+    # Never below 0: a fund can call slightly more than committed (fees,
+    # recycling), but that does not create a negative obligation.
+    out["unfunded"] = (out["commitment"] - out["paid_in"]).clip(lower=0)
     out["distributions"] = totals["distribution"]
     out["current_value"] = private["current_value"]
     out["dpi"] = out["distributions"] / out["paid_in"]
@@ -181,9 +189,82 @@ def allocation_gaps(investments, targets):
     ].sort_values(["client_id", "asset_class"]).reset_index(drop=True)
 
 
+# ---------------------------------------------------------------------------
+# Capital call coverage
+# ---------------------------------------------------------------------------
+
+def capital_call_coverage(investments, cash_flows):
+    """One row per client: total unfunded, liquid public value and coverage.
+
+    Coverage = current value of the client's public investments / the client's
+    total unfunded commitments. It is NaN when unfunded is 0 (nothing to cover).
+    """
+    private = private_investment_metrics(investments, cash_flows)
+    unfunded = private.groupby("client_id")["unfunded"].sum()
+    public_value = (
+        investments[investments["type"] == "public"]
+        .groupby("client_id")["current_value"]
+        .sum()
+    )
+    clients = investments["client_id"].drop_duplicates().sort_values()
+    out = pd.DataFrame(index=pd.Index(clients, name="client_id"))
+    out["unfunded"] = unfunded.reindex(out.index, fill_value=0)
+    out["public_value"] = public_value.reindex(out.index, fill_value=0)
+    out["coverage"] = (out["public_value"] / out["unfunded"]).where(out["unfunded"] > 0)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Rebalancing
+# ---------------------------------------------------------------------------
+
+def asset_class_liquidity(investments):
+    """'private' or 'public' for each (client_id, asset_class), from the data.
+
+    An asset class is private for a client when all of the client's holdings in
+    it are private investments; otherwise it is public. Nothing is hardcoded.
+    """
+    is_private = investments["type"].eq("private")
+    per_client = is_private.groupby(
+        [investments["client_id"], investments["asset_class"]]
+    ).all()
+    return per_client.map({True: "private", False: "public"}).rename("liquidity")
+
+
+def rebalancing(investments, targets):
+    """One row per client and asset class with the dollar move to reach target.
+
+    rebalance = target_pct / 100 * client total current value - current value.
+    Positive = add to the asset class, negative = reduce it. For each client the
+    amounts sum to 0 (when targets sum to 100%).
+    """
+    gaps = allocation_gaps(investments, targets)
+    client_total = gaps.groupby("client_id")["current_value"].transform("sum")
+    gaps["target_value"] = gaps["target_pct"] / 100 * client_total
+    gaps["rebalance"] = gaps["target_value"] - gaps["current_value"]
+
+    liquidity = asset_class_liquidity(investments).reset_index()
+    out = gaps.merge(liquidity, on=["client_id", "asset_class"], how="left")
+    # A class with a target but no holdings for this client: use how that
+    # class is held by other clients, and treat it as public if nobody holds it.
+    by_class = (
+        investments["type"].eq("private").groupby(investments["asset_class"]).all()
+        .map({True: "private", False: "public"})
+    )
+    out["liquidity"] = out["liquidity"].fillna(out["asset_class"].map(by_class)).fillna("public")
+    return out[
+        ["client_id", "client_name", "asset_class", "current_value",
+         "target_pct", "target_value", "rebalance", "liquidity"]
+    ]
+
+
 if __name__ == "__main__":
     inv, cf, tg = load_data()
     pd.set_option("display.width", 200)
     print(private_investment_metrics(inv, cf).round(4))
     print()
     print(allocation_gaps(inv, tg).round(2))
+    print()
+    print(capital_call_coverage(inv, cf).round(2))
+    print()
+    print(rebalancing(inv, tg).round(2))

@@ -11,7 +11,14 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from metrics import DATA_FILE, allocation_gaps, load_data, private_investment_metrics
+from metrics import (
+    DATA_FILE,
+    allocation_gaps,
+    capital_call_coverage,
+    load_data,
+    private_investment_metrics,
+    rebalancing,
+)
 
 ACTUAL_COLOR = "#C1A65D"  # accent gold
 TARGET_COLOR = "#6F6E6C"  # muted grey
@@ -123,6 +130,16 @@ def fmt_gap(x):
     return f"{x:+.1f}"
 
 
+def fmt_coverage(x):
+    return f"{x:.1f}x"
+
+
+def fmt_signed_dollars(x):
+    # +$58,000 / -$24,000. Round first so a tiny float error never shows as -$0.
+    x = round(x)
+    return f"{'-' if x < 0 else '+'}${abs(x):,.0f}"
+
+
 def eyebrow(text):
     """Small gold uppercase label shown above a heading."""
     st.markdown(f'<div class="eyebrow">{text}</div>', unsafe_allow_html=True)
@@ -141,6 +158,8 @@ def get_metrics(data_mtime):
     return (
         private_investment_metrics(investments, cash_flows),
         allocation_gaps(investments, targets),
+        capital_call_coverage(investments, cash_flows),
+        rebalancing(investments, targets),
     )
 
 
@@ -158,7 +177,7 @@ st.markdown(
 )
 st.caption("Fictional data. All values as of 2026-09-30.")
 
-private, gaps = get_metrics(DATA_FILE.stat().st_mtime)
+private, gaps, coverage, rebal = get_metrics(DATA_FILE.stat().st_mtime)
 
 clients = gaps[["client_id", "client_name"]].drop_duplicates().sort_values("client_id")
 client_name = st.selectbox("Client", clients["client_name"].tolist())
@@ -166,6 +185,8 @@ client_id = clients.loc[clients["client_name"] == client_name, "client_id"].iloc
 
 client_private = private[private["client_id"] == client_id]
 client_gaps = gaps[gaps["client_id"] == client_id]
+client_coverage = coverage.loc[client_id]
+client_rebal = rebal[rebal["client_id"] == client_id]
 
 # --- Summary figures -------------------------------------------------------
 eyebrow("Overview")
@@ -190,6 +211,7 @@ pi_table = pd.DataFrame({
     "Investment": client_private["name"],
     "Asset class": client_private["asset_class"],
     "Paid-in": client_private["paid_in"],
+    "Unfunded": client_private["unfunded"],
     "Distributions": client_private["distributions"],
     "Current value": client_private["current_value"],
     "DPI": client_private["dpi"],
@@ -200,6 +222,7 @@ pi_table = pd.DataFrame({
 st.dataframe(
     pi_table.style.format({
         "Paid-in": fmt_dollars,
+        "Unfunded": fmt_dollars,
         "Distributions": fmt_dollars,
         "Current value": fmt_dollars,
         "DPI": fmt_multiple,
@@ -273,6 +296,47 @@ table_col.dataframe(
         "Actual %": fmt_pct,
         "Target %": fmt_pct,
         "Gap (pp)": fmt_gap,
+    }),
+    hide_index=True,
+    width="stretch",
+)
+
+# --- Capital call coverage -------------------------------------------------
+eyebrow("Liquidity")
+st.subheader("Capital call coverage")
+st.caption(
+    "Coverage is how many times the client's public holdings, which can be sold quickly, "
+    "would cover the capital still to be called on their private commitments."
+)
+c1, c2, c3 = st.columns(3)
+c1.metric("Unfunded commitments", fmt_dollars(client_coverage["unfunded"]))
+c2.metric("Liquid public holdings", fmt_dollars(client_coverage["public_value"]))
+c3.metric(
+    "Coverage",
+    "No unfunded commitments"
+    if client_coverage["unfunded"] == 0
+    else fmt_coverage(client_coverage["coverage"]),
+)
+
+# --- Rebalancing -----------------------------------------------------------
+eyebrow("Rebalancing")
+st.subheader("Path to target")
+st.caption(
+    "Private asset classes cannot be traded quickly, so gaps close through new "
+    "commitments over time."
+)
+rebal_table = pd.DataFrame({
+    "Asset class": client_rebal["asset_class"],
+    "Current": client_rebal["current_value"],
+    "Target": client_rebal["target_value"],
+    "Rebalance": client_rebal["rebalance"],
+    "How": client_rebal["liquidity"].map({"public": "Trade", "private": "New commitments"}),
+}).reset_index(drop=True)
+st.dataframe(
+    rebal_table.style.format({
+        "Current": fmt_dollars,
+        "Target": fmt_dollars,
+        "Rebalance": fmt_signed_dollars,
     }),
     hide_index=True,
     width="stretch",
