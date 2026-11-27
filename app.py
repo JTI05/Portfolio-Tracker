@@ -11,7 +11,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from metrics import allocation_gaps, load_data, private_investment_metrics
+from metrics import DATA_FILE, allocation_gaps, load_data, private_investment_metrics
 
 ACTUAL_COLOR = "#1f4e79"  # dark blue
 TARGET_COLOR = "#a6b8c9"  # light grey-blue
@@ -46,7 +46,10 @@ def fmt_gap(x):
 # ---------------------------------------------------------------------------
 
 @st.cache_data
-def get_metrics():
+def get_metrics(data_mtime):
+    # data_mtime is not used inside the function. It is the cache key: when the
+    # workbook is saved, its last-modified time changes, so Streamlit treats it
+    # as a new call and reloads the data instead of reusing the cached result.
     investments, cash_flows, targets = load_data()
     return (
         private_investment_metrics(investments, cash_flows),
@@ -63,7 +66,7 @@ st.set_page_config(page_title="Portfolio Tracker", layout="wide")
 st.title("Portfolio Tracker")
 st.caption("Fictional data. All values as of 2026-09-30.")
 
-private, gaps = get_metrics()
+private, gaps = get_metrics(DATA_FILE.stat().st_mtime)
 
 clients = gaps[["client_id", "client_name"]].drop_duplicates().sort_values("client_id")
 client_name = st.selectbox("Client", clients["client_name"].tolist())

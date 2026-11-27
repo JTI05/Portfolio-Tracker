@@ -45,8 +45,14 @@ app.py             Streamlit dashboard; selects a client and displays the result
 metrics.py         Calculation layer: data loading, XIRR, deal metrics, allocation gaps
 test_metrics.py    Pytest suite that checks the metrics against expected results
 requirements.txt   Python dependencies
-data/              Fictional input data: investments, dated cash flows and target allocations
+data/              portfolio_data.xlsx: fictional input data in three tabs
+                   (investments, cash_flows, targets)
+tests/fixtures/    Fixed CSV copies of the data that the tests run against
 ```
+
+## Updating the data
+
+Edit `data/portfolio_data.xlsx` and save it. The app reloads the data the next time the page refreshes. The tests run on the fixed copies in `tests/fixtures/`, so editing the workbook does not affect them.
 
 ## Run locally
 

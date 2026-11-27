@@ -1,6 +1,13 @@
+from pathlib import Path
+
+import pandas as pd
 import pytest
 
-from metrics import allocation_gaps, load_data, private_investment_metrics, xirr
+from metrics import allocation_gaps, private_investment_metrics, xirr
+
+# The tests use fixed CSV copies of the data, not data/portfolio_data.xlsx,
+# so editing the workbook never changes the expected results below.
+FIXTURES_DIR = Path(__file__).parent / "tests" / "fixtures"
 
 RATIO_TOL = 0.005  # DPI, RVPI, TVPI
 IRR_TOL = 0.0005
@@ -25,7 +32,10 @@ EXPECTED_GAPS = [
 
 @pytest.fixture(scope="module")
 def data():
-    return load_data()
+    investments = pd.read_csv(FIXTURES_DIR / "investments.csv", parse_dates=["valuation_date"])
+    cash_flows = pd.read_csv(FIXTURES_DIR / "cash_flows.csv", parse_dates=["date"])
+    targets = pd.read_csv(FIXTURES_DIR / "targets.csv")
+    return investments, cash_flows, targets
 
 
 @pytest.fixture(scope="module")

@@ -1,6 +1,7 @@
 """Calculation layer for the portfolio tracker.
 
-Reads the three CSV files in data/ and computes:
+Reads the investments, cash_flows and targets tabs of data/portfolio_data.xlsx
+and computes:
   * per private investment: paid-in, distributions, current value,
     DPI, RVPI, TVPI and IRR (XIRR, 365-day year)
   * per client: actual allocation % by asset class and the gap to target
@@ -11,19 +12,26 @@ from pathlib import Path
 
 import pandas as pd
 
-DATA_DIR = Path(__file__).parent / "data"
+DATA_FILE = Path(__file__).parent / "data" / "portfolio_data.xlsx"
 
 
 # ---------------------------------------------------------------------------
 # Loading
 # ---------------------------------------------------------------------------
 
-def load_data(data_dir=DATA_DIR):
-    """Return (investments, cash_flows, targets) as DataFrames."""
-    data_dir = Path(data_dir)
-    investments = pd.read_csv(data_dir / "investments.csv", parse_dates=["valuation_date"])
-    cash_flows = pd.read_csv(data_dir / "cash_flows.csv", parse_dates=["date"])
-    targets = pd.read_csv(data_dir / "targets.csv")
+def load_data(path=DATA_FILE):
+    """Return (investments, cash_flows, targets) as DataFrames.
+
+    Each comes from the tab of the same name in the Excel workbook.
+    """
+    sheets = pd.read_excel(path, sheet_name=["investments", "cash_flows", "targets"])
+    investments = sheets["investments"]
+    cash_flows = sheets["cash_flows"]
+    targets = sheets["targets"]
+    # Excel usually stores dates as real dates, but convert anyway in case a
+    # date was typed in as text.
+    investments["valuation_date"] = pd.to_datetime(investments["valuation_date"])
+    cash_flows["date"] = pd.to_datetime(cash_flows["date"])
     return investments, cash_flows, targets
 
 
